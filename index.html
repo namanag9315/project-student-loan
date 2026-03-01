@@ -1,0 +1,491 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Student Loan Pro</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="header">
+    <div>
+      <div class="logo">Student Loan Pro</div>
+      <div class="logo-sub">India · Section 80E · AI-Powered Insights · Investment Simulator</div>
+      <div class="rate-status" id="rateStatus">
+        <span class="badge badge-yellow"><span class="live-dot yellow"></span> Static rates</span>
+        <button class="btn btn-sm" onclick="fetchLiveRates()" id="fetchBtn" style="background:var(--text);color:white;">
+          ⚡ Fetch Live Rates
+        </button>
+        <span id="rateNote" style="font-size:12px;color:var(--text3);font-weight:500;"></span>
+      </div>
+    </div>
+    <div class="flex gap-8 flex-wrap">
+      <button class="btn btn-outline btn-sm" onclick="exportExcel()">📥 Export Excel</button>
+    </div>
+  </div>
+
+  <div class="grid4" style="margin-bottom:12px;" id="metricsBar">
+    <div class="card2 metric"><div class="metric-label">Monthly EMI</div><div class="metric-value" style="color:var(--blue)" id="m-emi">—</div><div class="metric-sub" id="m-emi-sub">10 years</div></div>
+    <div class="card2 metric"><div class="metric-label">Total Cost</div><div class="metric-value" id="m-cost">—</div><div class="metric-sub">incl. interest</div></div>
+    <div class="card2 metric"><div class="metric-label">Tax Savings</div><div class="metric-value" style="color:var(--green)" id="m-tax">—</div><div class="metric-sub">Section 80E</div></div>
+    <div class="card2 metric"><div class="metric-label">Net Cost</div><div class="metric-value" id="m-net">—</div><div class="metric-sub">after benefits</div></div>
+  </div>
+
+  <div class="tabs" id="desktopTabs">
+    <button class="tab active" onclick="showTab('calc',this)"><span class="tab-label">⚙️ Calculator</span></button>
+    <button class="tab" onclick="showTab('charts',this)"><span class="tab-label">📊 Analysis</span></button>
+    <button class="tab" onclick="showTab('amort',this)"><span class="tab-label">📋 Schedule</span></button>
+    <button class="tab" onclick="showTab('banks',this)"><span class="tab-label">🏦 Banks</span></button>
+    <button class="tab" onclick="showTab('ai',this)"><span class="tab-label">🤖 AI Advisor</span></button>
+    <button class="tab" onclick="showTab('prepay',this)"><span class="tab-label">💰 Prepay</span></button>
+    <button class="tab" onclick="showTab('invest',this)"><span class="tab-label">💹 Invest</span></button>
+  </div>
+
+  <div id="tab-calc" style="display:block">
+    <div class="grid2 space-y-12">
+      <div class="space-y-12">
+        <div class="card">
+          <div class="section-title">Loan Structure</div>
+          <div class="section-sub">Enter your loan amounts and terms</div>
+          <div class="form-row">
+            <div class="form-group">
+              <label class="lbl">Phase 1 Total (₹)</label>
+              <input type="number" id="firstPhaseTotal" value="1500000" oninput="recalc()">
+            </div>
+            <div class="form-group">
+              <label class="lbl">Phase 2 Total (₹)</label>
+              <input type="number" id="secondPhaseTotal" value="2000000" oninput="recalc()">
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="lbl">Start Term</label>
+            <input type="number" id="startTerm" value="1" min="1" max="15" oninput="recalc()">
+            <small style="color:var(--text3)">Which term the loan starts from (e.g., 1 for first term)</small>
+          </div>
+          <div class="form-group">
+            <label class="lbl">Interest Rate <span class="val" id="rateLabel">8.65%</span></label>
+            <input type="range" id="interestRate" min="7" max="15" step="0.05" value="8.65"
+              oninput="document.getElementById('rateLabel').textContent=this.value+'%';recalc()">
+            <div class="range-labels"><span>7%</span><span>15%</span></div>
+          </div>
+          <div class="form-group">
+            <label class="lbl">Repayment Tenure <span class="val" id="tenureLabel">10 yrs</span></label>
+            <input type="range" id="repaymentYears" min="1" max="15" step="1" value="10"
+              oninput="document.getElementById('tenureLabel').textContent=this.value+' yrs';recalc()">
+            <div class="range-labels"><span>1 yr</span><span>15 yrs</span></div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label class="lbl">Course Start</label>
+              <input type="date" id="startDate" value="2024-01-01" oninput="recalc()">
+            </div>
+            <div class="form-group">
+              <label class="lbl">Tax Bracket</label>
+              <select id="taxBracket" onchange="recalc()">
+                <option value="0">0% — None</option>
+                <option value="20">20% — New Regime</option>
+                <option value="30" selected>30% — Old Regime</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-group">
+            <div class="toggle-wrap" onclick="toggleEarly()">
+              <div class="toggle-info">
+                <p>Repay from Course End</p>
+                <small>Skip the 12-month grace period</small>
+              </div>
+              <div class="toggle-switch off" id="earlyToggle"><div class="toggle-knob"></div></div>
+            </div>
+          </div>
+          <div class="form-group" id="gracePay">
+            <label class="lbl">Grace Period Monthly Payment (₹)</label>
+            <input type="number" id="gracePaymentAmount" value="0" oninput="recalc()">
+          </div>
+        </div>
+
+        <div class="card2">
+          <div class="section-title" style="font-size:14px;margin-bottom:12px;">Key Dates</div>
+          <div class="date-row"><span style="color:var(--text2)">📅 Course Start</span><span id="d-start" style="font-weight:600">—</span></div>
+          <div class="date-row"><span style="color:var(--text2)">🎓 Course End</span><span id="d-end" style="font-weight:600">—</span></div>
+          <div class="date-row"><span style="color:var(--text2)">⏳ Grace Ends</span><span id="d-grace" style="font-weight:600">—</span></div>
+          <div class="date-row"><span style="color:var(--text2)">💳 Repayment Starts</span><span id="d-repay" style="font-weight:600">—</span></div>
+        </div>
+      </div>
+
+      <div class="space-y-12">
+        <div class="emi-hero">
+          <div class="emi-label">Monthly EMI</div>
+          <div class="emi-val" id="emiVal">—</div>
+          <div class="emi-sub" id="emiSub">— payments over — years</div>
+          <div style="margin-top:20px" class="space-y-12">
+            <div class="breakdown-row"><span style="color:var(--text2); font-weight:500">Principal</span><span style="color:var(--blue);font-weight:600" id="s-principal">—</span></div>
+            <div class="breakdown-row"><span style="color:var(--text2); font-weight:500">Pre-EMI Interest</span><span style="color:var(--purple);font-weight:600" id="s-si">—</span></div>
+            <div class="breakdown-row"><span style="color:var(--text2); font-weight:500">EMI Interest</span><span style="color:var(--red);font-weight:600" id="s-ci">—</span></div>
+            <div class="breakdown-row"><span style="color:var(--text); font-weight:600">Total Repayment</span><span style="color:var(--text);font-weight:700" id="s-total">—</span></div>
+            <div class="breakdown-row" style="background:var(--green-lt);border-radius:6px;padding:10px;border:none">
+              <span style="color:var(--green); font-weight:600">80E Savings</span><span style="color:var(--green);font-weight:700" id="s-tax">—</span>
+            </div>
+            <div class="breakdown-row" style="padding:12px 0 0">
+              <span style="font-weight:700">Net Cost</span><span style="color:var(--text);font-weight:800;font-size:18px" id="s-net">—</span>
+            </div>
+          </div>
+          <div class="progress-bar" style="margin-top:20px">
+            <div class="progress-inner" id="progressBar"></div>
+          </div>
+          <div class="progress-labels"><span>Principal</span><span>Interest</span></div>
+          <div style="display:flex;gap:8px;margin-top:16px">
+            <button class="btn btn-ai" style="flex:1;justify-content:center;padding:12px" onclick="showTab('ai',null);fetchAI()">
+              🤖 AI Advice
+            </button>
+            <button class="btn" style="flex:1;justify-content:center;padding:12px;background:var(--green);color:white" onclick="showTab('invest',null);updateInvestSnapshot()">
+              💹 Invest Sim
+            </button>
+          </div>
+          <button class="btn" style="width:100%; justify-content:center; padding: 14px; font-size: 15px; margin-top: 10px; background:var(--blue); color:white" onclick="recalc(); showTab('charts', this)">
+            📊 Calculate & View Analysis
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:16px">
+      <div class="section-title">Disbursement Schedule</div>
+      <div class="section-sub">Per-term breakdown of loan releases and accrued pre-EMI interest</div>
+      <div style="overflow-x:auto">
+        <table class="tbl">
+          <thead><tr>
+            <th class="left">Term</th><th class="left">Date</th>
+            <th>Disbursed</th><th>Months SI</th><th>Pre-EMI Interest</th><th>Total Due</th>
+          </tr></thead>
+          <tbody id="disbBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div id="tab-charts" style="display:none" class="space-y-16">
+    <div class="grid2">
+      <div class="card">
+        <div class="section-title">Cost Breakdown</div>
+        <div class="section-sub">Where every rupee goes</div>
+        <div class="chart-wrap" id="pieChart"></div>
+      </div>
+      <div class="card">
+        <div class="section-title">Balance Over Time</div>
+        <div class="section-sub">Outstanding loan balance during repayment</div>
+        <div class="chart-wrap" id="balChart"></div>
+      </div>
+    </div>
+    <div class="grid2">
+      <div class="card">
+        <div class="section-title">Yearly Principal vs Interest</div>
+        <div class="section-sub">How each EMI splits each year</div>
+        <div class="chart-wrap" id="barChart"></div>
+      </div>
+      <div class="card">
+        <div class="section-title">80E Tax Savings</div>
+        <div class="section-sub">Annual interest paid vs tax benefit (8-year deduction)</div>
+        <div class="chart-wrap" id="taxChart"></div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="section-title">Section 80E — Annual Tax Benefit Table</div>
+      <div style="overflow-x:auto;margin-top:12px">
+        <table class="tbl">
+          <thead><tr>
+            <th class="left">Year</th><th>Interest Paid</th>
+            <th>Tax Saving</th><th>Monthly Saving</th><th>Effective EMI</th>
+          </tr></thead>
+          <tbody id="taxBody"></tbody>
+          <tfoot><tr id="taxFoot"></tr></tfoot>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div id="tab-amort" style="display:none">
+    <div class="card">
+      <div class="flex justify-between items-center flex-wrap gap-8" style="margin-bottom:14px">
+        <div>
+          <div class="section-title">Amortization Schedule</div>
+          <div class="section-sub" id="amortSub">— months · — years</div>
+        </div>
+        <div class="pager">
+          <button onclick="prevPage()" id="prevBtn">← Prev</button>
+          <span id="pageInfo">1 / 1</span>
+          <button onclick="nextPage()" id="nextBtn">Next →</button>
+        </div>
+      </div>
+      <div style="overflow-x:auto">
+        <table class="tbl">
+          <thead><tr>
+            <th class="left">Mo</th><th class="left">Yr</th>
+            <th>EMI</th><th>Principal</th><th>Interest</th>
+            <th>Balance</th><th class="hide-sm">Cum. Interest</th>
+          </tr></thead>
+          <tbody id="amortBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div id="tab-banks" style="display:none" class="space-y-16">
+    <div class="card">
+      <div class="flex justify-between items-center flex-wrap gap-8" style="margin-bottom:8px">
+        <div>
+          <div class="section-title">Bank Rate Comparison</div>
+          <div class="section-sub" id="bankSub">EMI comparison for your loan amount</div>
+        </div>
+        <span id="liveBadge" class="badge badge-yellow"><span class="live-dot yellow"></span> Static rates</span>
+      </div>
+      <div style="overflow-x:auto">
+        <table class="tbl">
+          <thead><tr>
+            <th class="left">Bank</th><th>Rate</th>
+            <th>EMI</th><th class="hide-sm">Total Paid</th>
+            <th>vs Yours</th>
+          </tr></thead>
+          <tbody id="bankBody"></tbody>
+        </table>
+      </div>
+    </div>
+    <div class="card">
+      <div class="section-title">EMI by Bank</div>
+      <div class="section-sub">Visual comparison across lenders</div>
+      <div class="chart-wrap" id="bankChart"></div>
+      <p style="font-size:12px;text-align:center;color:var(--text3);margin-top:12px">
+        <span style="color:var(--green)">■</span> Cheaper &nbsp;
+        <span style="color:var(--blue)">■</span> Your rate &nbsp;
+        <span style="color:var(--text3)">■</span> More expensive
+      </p>
+    </div>
+    <div class="disclaimer">
+      <strong>⚠️ Disclaimer</strong>
+      <p>Rates are indicative. Verify directly with each bank. Final rates depend on credit score, collateral, institution tier, and RBI policy.</p>
+    </div>
+  </div>
+
+  <div id="tab-ai" style="display:none" class="space-y-16">
+    <div class="card">
+      <div class="flex justify-between items-center flex-wrap gap-8" style="margin-bottom:16px">
+        <div>
+          <div class="section-title">AI Financial Advisor</div>
+          <div class="section-sub">Powered by Claude (Anthropic) · Personalized to your loan details</div>
+        </div>
+        <button class="btn btn-ai" id="aiBtn" onclick="fetchAI()">✨ Get AI Advice</button>
+      </div>
+      <div class="grid4" style="margin-bottom:16px" id="aiSnapshot"></div>
+      <div id="aiPanel">
+        <div class="ai-placeholder">
+          <div style="font-size:48px;margin-bottom:12px">🎓</div>
+          <div style="font-weight:700;color:var(--text);margin-bottom:6px;font-size:16px;">Ready to analyze your loan</div>
+          <div style="font-size:14px;color:var(--text3)">Click "Get AI Advice" for personalized repayment strategies, 80E optimization, and more.</div>
+          <div style="display:flex;flex-wrap:wrap;justify-content:center;gap:10px;margin-top:20px">
+            <span class="badge badge-blue">Repayment Strategy</span>
+            <span class="badge badge-green">80E Tax Tips</span>
+            <span class="badge badge-purple">Prepayment Analysis</span>
+            <span class="badge badge-yellow">Bank Negotiation</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="section-title">📐 Tenure Scenario Comparison</div>
+      <div class="section-sub">How different repayment periods affect your total cost</div>
+      <div style="overflow-x:auto;margin-top:12px">
+        <table class="tbl">
+          <thead><tr>
+            <th class="left">Tenure</th>
+            <th>Monthly EMI</th>
+            <th>Total Interest</th>
+            <th>Tax Savings</th>
+            <th>Net Cost</th>
+          </tr></thead>
+          <tbody id="scenarioTable"></tbody>
+        </table>
+      </div>
+    </div>
+    <div class="grid3" id="quickTips"></div>
+  </div>
+
+  <div id="tab-prepay" style="display:none" class="space-y-16">
+    <div class="card">
+      <div class="section-title">💰 Prepayment Calculator</div>
+      <div class="section-sub">See how extra payments reduce your total interest and shorten your loan</div>
+      <div class="form-row" style="margin-top:16px">
+        <div class="form-group">
+          <label class="lbl">Lump Sum Prepayment (₹)</label>
+          <input type="number" id="pp-lumpsum" value="100000" placeholder="e.g. 100000" oninput="calcPrepayment();updateBreakEven()">
+          <small style="color:var(--text3)">One-time extra payment</small>
+        </div>
+        <div class="form-group">
+          <label class="lbl">Extra Monthly Payment (₹)</label>
+          <input type="number" id="pp-monthly" value="0" placeholder="e.g. 5000" oninput="calcPrepayment()">
+          <small style="color:var(--text3)">Added to EMI each month</small>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="lbl">Apply Lump Sum in Year <span id="pp-when-label">1</span></label>
+        <input type="range" id="pp-when" min="1" max="10" step="1" value="1"
+          oninput="document.getElementById('pp-when-label').textContent=this.value;calcPrepayment();updateBreakEven()">
+        <div class="range-labels"><span>Year 1</span><span>Year 10</span></div>
+      </div>
+      <div id="pp-result" style="margin-top:8px"></div>
+      <div id="pp-breakeven"></div>
+    </div>
+  </div>
+
+  <div id="tab-invest" style="display:none" class="space-y-16">
+
+    <div class="card">
+      <div class="section-title">💹 Investment Simulator</div>
+      <div class="section-sub">What if you invested your EMI money instead of paying a loan? Compare SIP (Mutual Funds) vs Fixed Deposits.</div>
+
+      <div class="grid2" style="margin-top:16px">
+        <div>
+          <div class="form-group">
+            <label class="lbl">Lumpsum Investment (₹)</label>
+            <input type="number" id="inv-lumpsum" placeholder="e.g. 100000" oninput="this.dataset.manuallySet='1';runInvestCalc()">
+            <small style="color:var(--text3)">Loan amount invested upfront</small>
+          </div>
+          <div class="form-group">
+            <label class="lbl">Monthly Investment Amount (₹) <span class="val" style="color:var(--green)">← synced with EMI</span></label>
+            <input type="number" id="inv-amount" placeholder="Auto-filled from EMI" oninput="this.dataset.manuallySet='1';runInvestCalc()">
+          </div>
+          <div class="form-group">
+            <label class="lbl">Investment Period <span class="val" id="inv-years-label">10 yrs</span></label>
+            <input type="range" id="inv-years" min="1" max="30" step="1" value="10"
+              oninput="document.getElementById('inv-years-label').textContent=this.value+' yrs';runInvestCalc()">
+            <div class="range-labels"><span>1 yr</span><span>30 yrs</span></div>
+          </div>
+        </div>
+        <div>
+          <div class="form-group">
+            <label class="lbl">Expected SIP/MF Return <span class="val" id="mf-rate-label">12.0%</span></label>
+            <input type="range" id="mf-rate" min="5" max="25" step="0.5" value="12"
+              oninput="document.getElementById('mf-rate-label').textContent=parseFloat(this.value).toFixed(1)+'%';runInvestCalc()">
+            <div class="range-labels"><span>5%</span><span>25%</span></div>
+          </div>
+          <div class="form-group">
+            <label class="lbl">FD Interest Rate <span class="val" id="fd-rate-label">7.0%</span></label>
+            <input type="range" id="fd-rate" min="4" max="12" step="0.1" value="7"
+              oninput="document.getElementById('fd-rate-label').textContent=parseFloat(this.value).toFixed(1)+'%';runInvestCalc()">
+            <div class="range-labels"><span>4%</span><span>12%</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="section-title">🔍 Search Real Mutual Funds</div>
+      <div class="section-sub">Search from <strong>mfapi.in</strong> (live AMFI data) to get actual NAV & historical returns and auto-update the SIP rate above.</div>
+      <div class="flex gap-8" style="margin-top:14px">
+        <input type="text" id="mf-search" placeholder="e.g. Mirae Asset, Axis Bluechip, Parag Parikh…"
+          style="flex:1" oninput="debouncedMFSearch()" onkeydown="if(event.key==='Enter')searchMFunds()">
+        <button class="btn" style="background:var(--blue);color:white;white-space:nowrap" onclick="searchMFunds()">
+          🔍 Search
+        </button>
+      </div>
+      <div id="mf-results" style="margin-top:12px;border:1px solid var(--border);border-radius:6px;overflow:hidden;max-height:280px;overflow-y:auto"></div>
+      <div id="mf-selected" style="display:none"></div>
+    </div>
+
+    <div class="grid2">
+      <div class="card" style="border-top:4px solid var(--blue)">
+        <div class="section-title" style="color:var(--blue)">📈 SIP / Mutual Fund</div>
+        <div class="section-sub" id="inv-mf-sub">Expected annual return from SIP</div>
+        <div style="text-align:center;padding:20px 0">
+          <div style="font-size:12px;color:var(--text3);font-weight:600;text-transform:uppercase;letter-spacing:.5px">Final Corpus</div>
+          <div id="inv-sip-corpus" style="font-size:40px;font-weight:800;color:var(--blue);line-height:1.1;margin:6px 0">—</div>
+          <div id="inv-sip-invested" style="font-size:13px;color:var(--text3)">Total invested: —</div>
+        </div>
+        <div class="breakdown-row">
+          <span style="color:var(--text2)">Total Invested</span>
+          <span style="font-weight:600" id="inv-sip-invested2">—</span>
+        </div>
+        <div class="breakdown-row">
+          <span style="color:var(--text2)">Wealth Gain</span>
+          <span style="color:var(--blue);font-weight:700" id="inv-sip-gain">—</span>
+        </div>
+        <div class="breakdown-row">
+          <span style="color:var(--text2)">Expected Rate</span>
+          <span style="color:var(--blue);font-weight:700" id="inv-sip-xirr">—</span>
+        </div>
+      </div>
+
+      <div class="card" style="border-top:4px solid var(--green)">
+        <div class="section-title" style="color:var(--green)">🏦 Fixed Deposit (RD-style)</div>
+        <div class="section-sub">Quarterly compounded monthly deposits</div>
+        <div style="text-align:center;padding:20px 0">
+          <div style="font-size:12px;color:var(--text3);font-weight:600;text-transform:uppercase;letter-spacing:.5px">Final Corpus</div>
+          <div id="inv-fd-corpus" style="font-size:40px;font-weight:800;color:var(--green);line-height:1.1;margin:6px 0">—</div>
+          <div id="inv-fd-invested" style="font-size:13px;color:var(--text3)">Total invested: —</div>
+        </div>
+        <div class="breakdown-row">
+          <span style="color:var(--text2)">Total Invested</span>
+          <span style="font-weight:600" id="inv-fd-invested2">—</span>
+        </div>
+        <div class="breakdown-row">
+          <span style="color:var(--text2)">Interest Earned</span>
+          <span style="color:var(--green);font-weight:700" id="inv-fd-gain">—</span>
+        </div>
+        <div class="breakdown-row">
+          <span style="color:var(--text2)">FD Rate</span>
+          <span style="color:var(--green);font-weight:700" id="inv-fd-xirr">—</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="card" style="background:var(--blue-lt);border-color:#bfdbfe;text-align:center">
+      <div style="font-size:15px;color:var(--blue);font-weight:700" id="inv-diff">Calculating…</div>
+    </div>
+
+    <div id="inv-insight"></div>
+
+    <div class="card">
+      <div class="section-title">Corpus Growth Over Time</div>
+      <div class="section-sub">Year-by-year comparison of Invested amount vs SIP vs FD</div>
+      <div class="chart-wrap" id="inv-chart"></div>
+    </div>
+
+    <div class="card">
+      <div class="section-title">Year-by-Year Breakdown</div>
+      <div style="overflow-x:auto;margin-top:12px">
+        <table class="tbl">
+          <thead><tr>
+            <th class="left">Year</th>
+            <th>Invested</th>
+            <th style="color:var(--blue)">SIP Corpus</th>
+            <th style="color:var(--blue)">MF Gain</th>
+            <th style="color:var(--green)">FD Corpus</th>
+            <th style="color:var(--green)">FD Gain</th>
+          </tr></thead>
+          <tbody id="inv-table-body"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="disclaimer">
+      <strong>⚠️ Important Disclaimer</strong>
+      <p>Mutual Fund returns are <strong>not guaranteed</strong>. Market-linked investments carry risk. Historical returns do not guarantee future performance. This simulator is for educational purposes only. FD calculations assume monthly deposits with quarterly compounding. Consult a SEBI-registered financial advisor before investing.</p>
+    </div>
+  </div>
+
+</div><nav class="mobile-nav">
+  <div class="mobile-nav-inner">
+    <button class="mnb active" onclick="showTab('calc',this)" id="mnb-calc"><span class="mnb-icon">⚙️</span><span>Calc</span></button>
+    <button class="mnb" onclick="showTab('charts',this)" id="mnb-charts"><span class="mnb-icon">📊</span><span>Charts</span></button>
+    <button class="mnb" onclick="showTab('amort',this)" id="mnb-amort"><span class="mnb-icon">📋</span><span>Schedule</span></button>
+    <button class="mnb" onclick="showTab('banks',this)" id="mnb-banks"><span class="mnb-icon">🏦</span><span>Banks</span></button>
+    <button class="mnb" onclick="showTab('ai',this)" id="mnb-ai"><span class="mnb-icon">🤖</span><span>AI</span></button>
+    <button class="mnb" onclick="showTab('invest',this)" id="mnb-invest"><span class="mnb-icon">💹</span><span>Invest</span></button>
+  </div>
+</nav>
+
+<script src="app.js"></script>
+</body>
+</html>
