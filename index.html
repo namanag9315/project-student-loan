@@ -35,6 +35,7 @@
   </div>
 
   <div class="tabs" id="desktopTabs">
+    <button class="tab" onclick="showTab('dashboard',this)"><span class="tab-label">🧭 Dashboard</span></button>
     <button class="tab active" onclick="showTab('calc',this)"><span class="tab-label">⚙️ Calculator</span></button>
     <button class="tab" onclick="showTab('charts',this)"><span class="tab-label">📊 Analysis</span></button>
     <button class="tab" onclick="showTab('amort',this)"><span class="tab-label">📋 Schedule</span></button>
@@ -53,11 +54,11 @@
           <div class="section-sub">Enter your loan amounts and terms</div>
           <div class="form-row">
             <div class="form-group">
-              <label class="lbl">Phase 1 Total (₹)</label>
+              <label class="lbl">UG Total Fees (₹)</label>
               <input type="number" id="firstPhaseTotal" value="1500000" oninput="recalc()">
             </div>
             <div class="form-group">
-              <label class="lbl">Phase 2 Total (₹)</label>
+              <label class="lbl">PG Total Fees (₹)</label>
               <input type="number" id="secondPhaseTotal" value="2000000" oninput="recalc()">
             </div>
           </div>
@@ -163,6 +164,24 @@
           </tr></thead>
           <tbody id="disbBody"></tbody>
         </table>
+      </div>
+    </div>
+  </div>
+
+  <div id="tab-dashboard" style="display:none" class="space-y-16">
+    <div class="card">
+      <div class="section-title">📌 Financial Dashboard</div>
+      <div class="section-sub">Developed by Naman Agrawal · A quick decision cockpit across loan, tax benefits, and investment spread.</div>
+      <div class="grid4" id="dash-kpis"></div>
+    </div>
+    <div class="grid2">
+      <div class="card">
+        <div class="section-title">Repayment Health</div>
+        <div id="dash-health"></div>
+      </div>
+      <div class="card">
+        <div class="section-title">Action Summary</div>
+        <div id="dash-actions"></div>
       </div>
     </div>
   </div>
@@ -499,7 +518,11 @@
   <div id="tab-scholarships" style="display:none" class="space-y-16">
     <div class="card">
       <div class="section-title">🎓 Education Scholarship Finder</div>
-      <div class="section-sub">Filter scholarships by state, caste category, level, and income eligibility. Data can be replaced with a live API later.</div>
+      <div class="section-sub">Filter scholarships by state, caste category, level, and income eligibility. You can also fetch latest opportunities from Gemini web search.</div>
+      <div class="flex gap-8 flex-wrap" style="margin-bottom:10px">
+        <button class="btn btn-sm" onclick="fetchScholarshipsFromWeb()" id="schFetchBtn" style="background:var(--text);color:white">🌐 Fetch Live Scholarships</button>
+        <span id="sch-fetch-note" style="font-size:12px;color:var(--text3)"></span>
+      </div>
       <div class="grid2" style="margin-top:12px">
         <div class="form-group">
           <label class="lbl">State</label>
@@ -545,6 +568,7 @@
 
 </div><nav class="mobile-nav">
   <div class="mobile-nav-inner">
+    <button class="mnb" onclick="showTab('dashboard',this)" id="mnb-dashboard"><span class="mnb-icon">🧭</span><span>Dash</span></button>
     <button class="mnb active" onclick="showTab('calc',this)" id="mnb-calc"><span class="mnb-icon">⚙️</span><span>Calc</span></button>
     <button class="mnb" onclick="showTab('charts',this)" id="mnb-charts"><span class="mnb-icon">📊</span><span>Charts</span></button>
     <button class="mnb" onclick="showTab('amort',this)" id="mnb-amort"><span class="mnb-icon">📋</span><span>Schedule</span></button>

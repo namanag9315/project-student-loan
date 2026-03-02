@@ -56,6 +56,12 @@ const SCHOLARSHIPS = [
   { name:'Delhi Higher Education Support Scheme', state:'Delhi', caste:['General','OBC','SC','ST','EWS'], incomeLimit: 800000, maxSupport:'Up to ₹1L/yr', level:['UG','PG','MBA'] },
 ];
 
+let scholarshipState = {
+  liveItems: [],
+  loading: false,
+  source: 'local'
+};
+
 // ── Formatting ──────────────────────────────────────────────────────────────
 const fmtC = v => new Intl.NumberFormat('en-IN',{style:'currency',currency:'INR',maximumFractionDigits:0}).format(v);
 const fmtL = v => '₹'+(v/100000).toFixed(2)+'L';
@@ -199,7 +205,7 @@ function render() {
   try { compute(); } catch(e) { console.error('compute()',e); return; }
   const fns = [updateMetrics, updateSummary, updateDisbTable, updateDates,
                 updateAmort, updateCharts, updateBanks, updateAISnapshot,
-                updateTips, updateInvestSnapshot, updatePrepayPanel];
+                updateTips, updateInvestSnapshot, updatePrepayPanel, updateDashboard];
   fns.forEach(fn => { try { fn(); } catch(e) { console.error(fn.name+'()',e); } });
 }
 
@@ -622,7 +628,7 @@ function updateBreakEven() {
 }
 
 // ── Tab switching ─────────────────────────────────────────────────────────────
-const PANELS = ['calc','charts','amort','banks','ai','prepay','invest','scholarships'];
+const PANELS = ['dashboard','calc','charts','amort','banks','ai','prepay','invest','scholarships'];
 function showTab(id, btn) {
   PANELS.forEach(p=>{
     const el=document.getElementById('tab-'+p);
@@ -634,10 +640,42 @@ function showTab(id, btn) {
   const mnb=document.getElementById('mnb-'+id);
   if(mnb) mnb.classList.add('active');
 
+  if(id==='dashboard') updateDashboard();
   if(id==='charts') updateCharts();
   if(id==='banks')  updateBanks();
   if(id==='invest') updateInvestSnapshot();
   if(id==='scholarships') renderScholarships();
+}
+
+function updateDashboard() {
+  const kpis = document.getElementById('dash-kpis');
+  const health = document.getElementById('dash-health');
+  const actions = document.getElementById('dash-actions');
+  if (!kpis || !health || !actions) return;
+
+  const emiPctSalary = ((calc.emi * 12) / 2900000) * 100;
+  const interestShare = (calc.totIAll / calc.totCost) * 100;
+  const investVsLoan = (investState.strategyNet || 0);
+
+  kpis.innerHTML = `
+    <div class="card2"><div class="metric-label">EMI Load</div><div class="metric-value" style="font-size:24px">${emiPctSalary.toFixed(1)}%</div><div class="metric-sub">of ₹29L CTC benchmark</div></div>
+    <div class="card2"><div class="metric-label">Interest Share</div><div class="metric-value" style="font-size:24px;color:var(--red)">${interestShare.toFixed(1)}%</div><div class="metric-sub">of total loan cost</div></div>
+    <div class="card2"><div class="metric-label">Tax Shield</div><div class="metric-value" style="font-size:24px;color:var(--green)">${fmtC(calc.totTax)}</div><div class="metric-sub">Section 80E estimate</div></div>
+    <div class="card2"><div class="metric-label">Invest Spread</div><div class="metric-value" style="font-size:24px;color:${investVsLoan>=0?'var(--green)':'var(--red)'}">${fmtC(investVsLoan)}</div><div class="metric-sub">MF drawdown strategy net</div></div>`;
+
+  health.innerHTML = `
+    <div class="dash-list-item"><span>Loan Principal</span><strong>${fmtC(calc.totP)}</strong></div>
+    <div class="dash-list-item"><span>Total Repayment</span><strong>${fmtC(calc.totRep)}</strong></div>
+    <div class="dash-list-item"><span>Net Cost (after tax)</span><strong>${fmtC(calc.netCost)}</strong></div>
+    <div class="dash-list-item"><span>Prepay savings potential</span><strong>${fmtC(calc.prepayImpact?.interestSaved || 0)}</strong></div>`;
+
+  actions.innerHTML = `
+    <div class="card2" style="border-left:3px solid ${emiPctSalary > 20 ? 'var(--amber)' : 'var(--green)'}">
+      ${emiPctSalary > 20 ? '⚠️ EMI load is above 20% of benchmark salary. Consider extending tenure slightly or using scholarships/prepayment to reduce stress.' : '✅ EMI load is in a manageable range against benchmark salary.'}
+    </div>
+    <div class="card2" style="margin-top:10px;border-left:3px solid ${investVsLoan >= 0 ? 'var(--green)' : 'var(--amber)'}">
+      ${investVsLoan >= 0 ? '✅ Current investment assumptions beat loan carrying cost. Continue disciplined SIP if risk tolerance allows.' : '⚠️ Loan cost currently beats investment assumptions. Prioritize partial prepayment.'}
+    </div>`;
 }
 
 function toggleEarly() {
@@ -893,17 +931,19 @@ function renderLoanToMFStrategy({ fromTerm, toTerm, perTerm, years, mfRate }) {
 function initScholarshipFilters() {
   const stateEl = document.getElementById('sch-state');
   if (!stateEl) return;
-  const states = ['All States', ...new Set(SCHOLARSHIPS.map(s => s.state))];
+  const sourceData = scholarshipState.liveItems.length ? scholarshipState.liveItems : SCHOLARSHIPS;
+  const states = ['All States', ...new Set(sourceData.map(s => s.state))];
   stateEl.innerHTML = states.map(s => `<option value="${s}">${s}</option>`).join('');
 }
 
 function renderScholarships() {
+  const sourceData = scholarshipState.liveItems.length ? scholarshipState.liveItems : SCHOLARSHIPS;
   const stateQ = document.getElementById('sch-state')?.value || 'All States';
   const casteQ = document.getElementById('sch-caste')?.value || 'All';
   const incomeQ = +document.getElementById('sch-income')?.value || 0;
   const levelQ = document.getElementById('sch-level')?.value || 'All';
 
-  const filtered = SCHOLARSHIPS.filter(s => {
+  const filtered = sourceData.filter(s => {
     const stateOk = stateQ === 'All States' || s.state === 'All India' || s.state === stateQ;
     const casteOk = casteQ === 'All' || s.caste.includes('All') || s.caste.includes(casteQ);
     const incomeOk = !incomeQ || s.incomeLimit >= incomeQ;
@@ -924,7 +964,44 @@ function renderScholarships() {
 
   const summary = document.getElementById('sch-summary');
   if (summary) {
-    summary.innerHTML = `Showing <strong>${filtered.length}</strong> scholarship options. Prefer schemes with <strong>tuition reimbursement + maintenance allowance</strong> to reduce loan need before taking higher-cost debt.`;
+    const mode = scholarshipState.liveItems.length ? 'live web search' : 'built-in list';
+    summary.innerHTML = `Showing <strong>${filtered.length}</strong> scholarship options from <strong>${mode}</strong>. Prefer schemes with <strong>tuition reimbursement + maintenance allowance</strong> to reduce loan need before taking higher-cost debt.`;
+  }
+}
+
+async function fetchScholarshipsFromWeb() {
+  const btn = document.getElementById('schFetchBtn');
+  const note = document.getElementById('sch-fetch-note');
+  if (scholarshipState.loading) return;
+  scholarshipState.loading = true;
+  if (btn) btn.disabled = true;
+  if (note) note.textContent = 'Fetching latest scholarships via Gemini web search...';
+  try {
+    const r = await fetch('/api/scholarships', { method: 'POST' });
+    const data = await r.json();
+    const raw = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+    const parsed = JSON.parse(raw || '{}');
+    if (!Array.isArray(parsed.scholarships) || !parsed.scholarships.length) {
+      throw new Error('No scholarships returned');
+    }
+
+    scholarshipState.liveItems = parsed.scholarships.map(s => ({
+      name: s.name || 'Scholarship',
+      state: s.state || 'All India',
+      caste: Array.isArray(s.caste) ? s.caste : ['All'],
+      incomeLimit: Number(s.incomeLimit) || 0,
+      maxSupport: s.maxSupport || 'Varies',
+      level: Array.isArray(s.level) ? s.level : ['UG','PG']
+    }));
+    initScholarshipFilters();
+    renderScholarships();
+    if (note) note.textContent = `Live scholarships updated (${scholarshipState.liveItems.length} schemes).`;
+  } catch (err) {
+    console.error(err);
+    if (note) note.textContent = 'Could not fetch live scholarships. Showing built-in data.';
+  } finally {
+    scholarshipState.loading = false;
+    if (btn) btn.disabled = false;
   }
 }
 
@@ -1149,9 +1226,14 @@ function applyMFData(fund, navData, detailEl, listEl) {
 function exportExcel() {
   const wb = XLSX.utils.book_new();
 
-  function makeSheet(aoa, cols) {
+  function makeSheet(aoa, cols, headerRow = 0) {
     const ws = XLSX.utils.aoa_to_sheet(aoa);
     if (cols) ws['!cols'] = cols.map(w=>({wch:w}));
+    ws['!freeze'] = { xSplit: 0, ySplit: headerRow + 1 };
+    if (headerRow >= 0 && aoa[headerRow]) {
+      const lastColLetter = XLSX.utils.encode_col(aoa[headerRow].length - 1);
+      ws['!autofilter'] = { ref: `A${headerRow+1}:${lastColLetter}${headerRow+1}` };
+    }
     return ws;
   }
 
@@ -1164,8 +1246,8 @@ function exportExcel() {
     [''],
     ['━━━ LOAN INPUTS ━━━'],
     ['Parameter','Value'],
-    ['Phase 1 Total',           fmtC(state.firstPhaseTotal)],
-    ['Phase 2 Total',           fmtC(state.secondPhaseTotal)],
+    ['UG Fees Total',           fmtC(state.firstPhaseTotal)],
+    ['PG Fees Total',           fmtC(state.secondPhaseTotal)],
     ['Total Loan Principal',    fmtC(calc.totP)],
     ['Interest Rate',           state.interestRate + '%'],
     ['Repayment Tenure',        state.repaymentYears + ' years'],
@@ -1196,7 +1278,7 @@ function exportExcel() {
     ['Interest Saved',  calc.prepayImpact?.interestSaved || 0],
     ['New Tenure (yrs)',(calc.prepayImpact?.monthsNew||0)/12],
   ];
-  XLSX.utils.book_append_sheet(wb, makeSheet(s1,[35,20]), 'Summary');
+  XLSX.utils.book_append_sheet(wb, makeSheet(s1,[35,20],4), 'Summary');
 
   // Sheet 2: Disbursements
   const s2 = [
@@ -1206,7 +1288,7 @@ function exportExcel() {
     [''],
     ['TOTAL','',+calc.totP.toFixed(2),'',+calc.totSI.toFixed(2),+(calc.totP+calc.totSI).toFixed(2)],
   ];
-  XLSX.utils.book_append_sheet(wb, makeSheet(s2,[8,14,20,18,20,16]), 'Disbursements');
+  XLSX.utils.book_append_sheet(wb, makeSheet(s2,[8,14,20,18,20,16],2), 'Disbursements');
 
   // Sheet 3: Full Amortization
   const s3 = [
@@ -1216,7 +1298,7 @@ function exportExcel() {
     [''],
     ['TOTAL','',+calc.totRep.toFixed(2),+calc.totP.toFixed(2),+calc.totI.toFixed(2),'0','',''],
   ];
-  XLSX.utils.book_append_sheet(wb, makeSheet(s3,[8,6,12,18,17,14,17,17]), 'Amortization');
+  XLSX.utils.book_append_sheet(wb, makeSheet(s3,[8,6,12,18,17,14,17,17],2), 'Amortization');
 
   // Sheet 4: Yearly Summary
   const s4 = [
@@ -1224,7 +1306,7 @@ function exportExcel() {
     ['Year','Principal Paid (₹)','Interest Paid (₹)','Total EMI Paid (₹)','Balance (₹)','Interest %'],
     ...calc.yearSummary.map(d=>['Year '+d.y,+d.pp.toFixed(2),+d.ip.toFixed(2),+(d.pp+d.ip).toFixed(2),+d.bal.toFixed(2),+((d.ip/(d.pp+d.ip))*100).toFixed(1)]),
   ];
-  XLSX.utils.book_append_sheet(wb, makeSheet(s4,[8,18,17,18,14,12]), 'Yearly Summary');
+  XLSX.utils.book_append_sheet(wb, makeSheet(s4,[8,18,17,18,14,12],2), 'Yearly Summary');
 
   // Sheet 5: Tax Benefits
   const s5 = [
@@ -1236,7 +1318,7 @@ function exportExcel() {
     [''],
     ['TOTAL',+calc.yearlyTax.reduce((s,y)=>s+y.yi,0).toFixed(2),+calc.totTax.toFixed(2),+(calc.totTax/96).toFixed(2),'',''],
   ];
-  XLSX.utils.book_append_sheet(wb, makeSheet(s5,[8,18,16,18,16,16]), 'Tax Benefits (80E)');
+  XLSX.utils.book_append_sheet(wb, makeSheet(s5,[8,18,16,18,16,16],5), 'Tax Benefits (80E)');
 
   // Sheet 6: Bank Comparison
   const nm = state.repaymentYears*12;
@@ -1255,7 +1337,7 @@ function exportExcel() {
     [''],
     ['Note: Rates are indicative. Verify directly with banks.'],
   ];
-  XLSX.utils.book_append_sheet(wb, makeSheet(s6,[22,14,10,18,18,22,10]), 'Bank Comparison');
+  XLSX.utils.book_append_sheet(wb, makeSheet(s6,[22,14,10,18,18,22,10],4), 'Bank Comparison');
 
   // Sheet 7: Investment Simulator
   const lumpsum   = investState.lumpsumAmount || 0;
@@ -1311,7 +1393,7 @@ function exportExcel() {
     [''],
     ['Note: MF returns are not guaranteed. Past performance is not indicative of future results.'],
   ];
-  XLSX.utils.book_append_sheet(wb, makeSheet(s7,[28,18,18,14,14,14]), 'Investment Simulator');
+  XLSX.utils.book_append_sheet(wb, makeSheet(s7,[28,18,18,14,14,14],17), 'Investment Simulator');
 
   XLSX.writeFile(wb, `StudentLoanPro_${now.replace(/ /g,'_')}.xlsx`);
 }

@@ -221,3 +221,14 @@ svg text { font-family: inherit; }
 #inv-sip-invested, #inv-fd-invested { display: none; } /* handled by breakdown-row */
 
 /* fix double-render of invested amount */
+
+/* ── Dashboard ── */
+.dash-list-item {
+  display:flex;
+  justify-content:space-between;
+  padding:10px 0;
+  border-bottom:1px solid var(--border);
+  color:var(--text2);
+}
+.dash-list-item strong { color: var(--text); }
+.dash-list-item:last-child { border-bottom:none; }
