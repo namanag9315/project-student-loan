@@ -36,9 +36,25 @@ let investState = {
   mfLoading: false,
   selectedMF: null,
   mfReturnsRate: 12.0,
+  strategyNet: 0,
+  strategyCorpus: 0,
+  strategyLoanCost: 0,
   // ✅ NAV cache: schemeCode → { latestNAV, ret1y, ret3y, ret5y }
   navCache: {},
 };
+
+const SCHOLARSHIPS = [
+  { name:'Central Sector Scheme of Scholarship', state:'All India', caste:['All'], incomeLimit: 800000, maxSupport:'₹20,000/yr', level:['UG','PG'] },
+  { name:'Post-Matric Scholarship for SC Students', state:'All India', caste:['SC'], incomeLimit: 250000, maxSupport:'Tuition + maintenance', level:['UG','PG','MBA'] },
+  { name:'Top Class Education Scheme for ST Students', state:'All India', caste:['ST'], incomeLimit: 800000, maxSupport:'Up to ₹2.2L/yr', level:['UG','PG','MBA'] },
+  { name:'Merit-cum-Means Scholarship (Minority)', state:'All India', caste:['Minority'], incomeLimit: 250000, maxSupport:'₹20,000/yr', level:['UG','PG'] },
+  { name:'Ishan Uday (NER)', state:'Assam', caste:['All'], incomeLimit: 450000, maxSupport:'₹78,000/yr', level:['UG'] },
+  { name:'Chief Minister Fellowship', state:'Maharashtra', caste:['OBC','SC','ST','EWS'], incomeLimit: 800000, maxSupport:'₹50,000/yr', level:['PG','MBA'] },
+  { name:'Karnataka Pratibha Puraskar', state:'Karnataka', caste:['SC','ST','OBC'], incomeLimit: 600000, maxSupport:'₹30,000 one-time', level:['UG','PG'] },
+  { name:'West Bengal Aikyashree', state:'West Bengal', caste:['Minority'], incomeLimit: 250000, maxSupport:'₹33,000/yr', level:['UG','PG'] },
+  { name:'Tamil Nadu First Graduate Scholarship', state:'Tamil Nadu', caste:['All'], incomeLimit: 300000, maxSupport:'₹25,000/yr', level:['UG'] },
+  { name:'Delhi Higher Education Support Scheme', state:'Delhi', caste:['General','OBC','SC','ST','EWS'], incomeLimit: 800000, maxSupport:'Up to ₹1L/yr', level:['UG','PG','MBA'] },
+];
 
 // ── Formatting ──────────────────────────────────────────────────────────────
 const fmtC = v => new Intl.NumberFormat('en-IN',{style:'currency',currency:'INR',maximumFractionDigits:0}).format(v);
@@ -606,7 +622,7 @@ function updateBreakEven() {
 }
 
 // ── Tab switching ─────────────────────────────────────────────────────────────
-const PANELS = ['calc','charts','amort','banks','ai','prepay','invest'];
+const PANELS = ['calc','charts','amort','banks','ai','prepay','invest','scholarships'];
 function showTab(id, btn) {
   PANELS.forEach(p=>{
     const el=document.getElementById('tab-'+p);
@@ -621,6 +637,7 @@ function showTab(id, btn) {
   if(id==='charts') updateCharts();
   if(id==='banks')  updateBanks();
   if(id==='invest') updateInvestSnapshot();
+  if(id==='scholarships') renderScholarships();
 }
 
 function toggleEarly() {
@@ -728,7 +745,8 @@ async function fetchAI() {
 - Tax Bracket: ${state.taxBracket}% (Section 80E eligible)
 - Total Tax Savings (8 yrs): ${fmtC(calc.totTax)}
 - Net Cost (after tax): ${fmtC(calc.netCost)}
-- Prepayment (₹50K/yr extra) saves: ${fmtC(calc.prepayImpact?.interestSaved||0)} (${calc.prepayImpact?.monthsSaved||0} months early)`;
+- Prepayment (₹50K/yr extra) saves: ${fmtC(calc.prepayImpact?.interestSaved||0)} (${calc.prepayImpact?.monthsSaved||0} months early)
+- Loan drawdown→MF strategy net spread: ${fmtC(investState.strategyNet||0)} (MF corpus ${fmtC(investState.strategyCorpus||0)} vs loan carrying cost ${fmtC(investState.strategyLoanCost||0)})`;
 
   try {
     const res  = await fetch('/api/advice', {
@@ -787,6 +805,9 @@ function runInvestCalc() {
   const years   = +document.getElementById('inv-years')?.value  || 10;
   const fdRate  = +document.getElementById('fd-rate')?.value    || 7.0;
   const mfRate  = +document.getElementById('mf-rate')?.value    || 12.0;
+  const fromTerm = +document.getElementById('arb-from-term')?.value || 1;
+  const toTerm = +document.getElementById('arb-to-term')?.value || 6;
+  const perTerm = +document.getElementById('arb-per-term')?.value || 0;
 
   investState.lumpsumAmount = lumpsum;
   investState.monthlyAmount = monthly;
@@ -822,6 +843,89 @@ function runInvestCalc() {
   }
 
   renderInvestResults({ monthly, years, mfRate, fdRate, sipCorpus, sipInvested, sipGain, fdCorpus, fdInvested, fdGain, yearData, lumpsum });
+  renderLoanToMFStrategy({ fromTerm, toTerm, perTerm, years, mfRate });
+}
+
+function renderLoanToMFStrategy({ fromTerm, toTerm, perTerm, years, mfRate }) {
+  const el = document.getElementById('arb-results');
+  if (!el) return;
+  const minTerm = Math.max(1, Math.min(fromTerm, toTerm));
+  const maxTerm = Math.max(minTerm, Math.max(fromTerm, toTerm));
+  const selected = calc.disbD.filter(d => d.term >= minTerm && d.term <= maxTerm);
+  if (!selected.length || perTerm <= 0) {
+    el.innerHTML = '<div class="card2">Enter term range and per-term amount to simulate strategy.</div>';
+    return;
+  }
+
+  const horizon = years * 12;
+  const loanMr = state.interestRate / (12 * 100);
+  let corpus = 0;
+  let invested = 0;
+  let loanCost = 0;
+  selected.forEach(d => {
+    const months = Math.max(0, horizon - d.monthsFromStart);
+    const growth = Math.pow(1 + mfRate / (12 * 100), months);
+    const debtGrowth = Math.pow(1 + loanMr, months);
+    corpus += perTerm * growth;
+    invested += perTerm;
+    loanCost += perTerm * (debtGrowth - 1);
+  });
+
+  const gain = corpus - invested;
+  const net = gain - loanCost;
+  investState.strategyNet = net;
+  investState.strategyCorpus = corpus;
+  investState.strategyLoanCost = loanCost;
+
+  el.innerHTML = `<div class="grid4" style="margin-top:8px">
+    <div class="card2"><div class="metric-label">Total Invested</div><div class="metric-value" style="font-size:22px">${fmtC(invested)}</div></div>
+    <div class="card2"><div class="metric-label">MF Corpus</div><div class="metric-value" style="font-size:22px;color:var(--blue)">${fmtC(corpus)}</div></div>
+    <div class="card2"><div class="metric-label">Loan Carrying Cost</div><div class="metric-value" style="font-size:22px;color:var(--red)">${fmtC(loanCost)}</div></div>
+    <div class="card2"><div class="metric-label">Net Spread</div><div class="metric-value" style="font-size:22px;color:${net>=0?'var(--green)':'var(--red)'}">${fmtC(net)}</div></div>
+  </div>
+  <div class="card2" style="margin-top:10px;border-left:3px solid ${net>=0?'var(--green)':'var(--amber)'}">
+    ${net >= 0
+      ? `✅ At <strong>${mfRate.toFixed(1)}%</strong> MF return, this strategy is ahead by <strong>${fmtC(net)}</strong> over ${years} years.`
+      : `⚠️ At <strong>${mfRate.toFixed(1)}%</strong> MF return, expected gain is below loan cost by <strong>${fmtC(Math.abs(net))}</strong>. Consider lower borrowing or partial prepayment.`}
+  </div>`;
+}
+
+function initScholarshipFilters() {
+  const stateEl = document.getElementById('sch-state');
+  if (!stateEl) return;
+  const states = ['All States', ...new Set(SCHOLARSHIPS.map(s => s.state))];
+  stateEl.innerHTML = states.map(s => `<option value="${s}">${s}</option>`).join('');
+}
+
+function renderScholarships() {
+  const stateQ = document.getElementById('sch-state')?.value || 'All States';
+  const casteQ = document.getElementById('sch-caste')?.value || 'All';
+  const incomeQ = +document.getElementById('sch-income')?.value || 0;
+  const levelQ = document.getElementById('sch-level')?.value || 'All';
+
+  const filtered = SCHOLARSHIPS.filter(s => {
+    const stateOk = stateQ === 'All States' || s.state === 'All India' || s.state === stateQ;
+    const casteOk = casteQ === 'All' || s.caste.includes('All') || s.caste.includes(casteQ);
+    const incomeOk = !incomeQ || s.incomeLimit >= incomeQ;
+    const levelOk = levelQ === 'All' || s.level.includes(levelQ);
+    return stateOk && casteOk && incomeOk && levelOk;
+  });
+
+  const body = document.getElementById('sch-body');
+  if (body) {
+    body.innerHTML = filtered.length ? filtered.map(s => `<tr>
+      <td class="left"><strong>${s.name}</strong><br><span style="font-size:11px;color:var(--text3)">${s.state}</span></td>
+      <td>${s.caste.join(', ')}</td>
+      <td>${s.maxSupport}</td>
+      <td>₹${s.incomeLimit.toLocaleString('en-IN')}</td>
+      <td>${s.level.join(', ')}</td>
+    </tr>`).join('') : '<tr><td colspan="5" class="left">No scholarships found for selected filters.</td></tr>';
+  }
+
+  const summary = document.getElementById('sch-summary');
+  if (summary) {
+    summary.innerHTML = `Showing <strong>${filtered.length}</strong> scholarship options. Prefer schemes with <strong>tuition reimbursement + maintenance allowance</strong> to reduce loan need before taking higher-cost debt.`;
+  }
 }
 
 function renderInvestResults({ monthly, years, mfRate, fdRate, sipCorpus, sipInvested, sipGain, fdCorpus, fdInvested, fdGain, yearData, lumpsum }) {
@@ -1214,5 +1318,7 @@ function exportExcel() {
 
 // ── Init ──────────────────────────────────────────────────────────────────────
 window.addEventListener('DOMContentLoaded', () => {
+  initScholarshipFilters();
+  renderScholarships();
   render();
 });
