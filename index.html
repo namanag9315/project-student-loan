@@ -42,6 +42,7 @@
     <button class="tab" onclick="showTab('ai',this)"><span class="tab-label">🤖 AI Advisor</span></button>
     <button class="tab" onclick="showTab('prepay',this)"><span class="tab-label">💰 Prepay</span></button>
     <button class="tab" onclick="showTab('invest',this)"><span class="tab-label">💹 Invest</span></button>
+    <button class="tab" onclick="showTab('scholarships',this)"><span class="tab-label">🎓 Scholarships</span></button>
   </div>
 
   <div id="tab-calc" style="display:block">
@@ -447,6 +448,26 @@
     <div id="inv-insight"></div>
 
     <div class="card">
+      <div class="section-title">🧪 Loan Drawdown → Mutual Fund Strategy</div>
+      <div class="section-sub">Simulate taking loan in selected terms and investing that amount as lumpsum each term in a mutual fund.</div>
+      <div class="grid3" style="margin-top:12px">
+        <div class="form-group">
+          <label class="lbl">From Term</label>
+          <input type="number" id="arb-from-term" min="1" max="15" value="1" oninput="runInvestCalc()">
+        </div>
+        <div class="form-group">
+          <label class="lbl">To Term</label>
+          <input type="number" id="arb-to-term" min="1" max="15" value="6" oninput="runInvestCalc()">
+        </div>
+        <div class="form-group">
+          <label class="lbl">Invest per Term (₹)</label>
+          <input type="number" id="arb-per-term" value="250000" oninput="runInvestCalc()">
+        </div>
+      </div>
+      <div id="arb-results"></div>
+    </div>
+
+    <div class="card">
       <div class="section-title">Corpus Growth Over Time</div>
       <div class="section-sub">Year-by-year comparison of Invested amount vs SIP vs FD</div>
       <div class="chart-wrap" id="inv-chart"></div>
@@ -475,6 +496,53 @@
     </div>
   </div>
 
+  <div id="tab-scholarships" style="display:none" class="space-y-16">
+    <div class="card">
+      <div class="section-title">🎓 Education Scholarship Finder</div>
+      <div class="section-sub">Filter scholarships by state, caste category, level, and income eligibility. Data can be replaced with a live API later.</div>
+      <div class="grid2" style="margin-top:12px">
+        <div class="form-group">
+          <label class="lbl">State</label>
+          <select id="sch-state" onchange="renderScholarships()"></select>
+        </div>
+        <div class="form-group">
+          <label class="lbl">Caste Category</label>
+          <select id="sch-caste" onchange="renderScholarships()">
+            <option value="All">All Categories</option>
+            <option value="General">General</option>
+            <option value="OBC">OBC</option>
+            <option value="SC">SC</option>
+            <option value="ST">ST</option>
+            <option value="EWS">EWS</option>
+            <option value="Minority">Minority</option>
+          </select>
+        </div>
+      </div>
+      <div class="grid2">
+        <div class="form-group">
+          <label class="lbl">Family Income Ceiling (₹)</label>
+          <input type="number" id="sch-income" value="800000" oninput="renderScholarships()">
+        </div>
+        <div class="form-group">
+          <label class="lbl">Level</label>
+          <select id="sch-level" onchange="renderScholarships()">
+            <option value="All">All Levels</option>
+            <option value="UG">UG</option>
+            <option value="PG">PG</option>
+            <option value="MBA">MBA</option>
+          </select>
+        </div>
+      </div>
+      <div id="sch-summary" class="card2" style="margin-top:8px"></div>
+      <div style="overflow-x:auto;margin-top:10px">
+        <table class="tbl">
+          <thead><tr><th class="left">Scholarship</th><th>Category</th><th>Max Support</th><th>Income Limit</th><th>Level</th></tr></thead>
+          <tbody id="sch-body"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
 </div><nav class="mobile-nav">
   <div class="mobile-nav-inner">
     <button class="mnb active" onclick="showTab('calc',this)" id="mnb-calc"><span class="mnb-icon">⚙️</span><span>Calc</span></button>
@@ -483,6 +551,7 @@
     <button class="mnb" onclick="showTab('banks',this)" id="mnb-banks"><span class="mnb-icon">🏦</span><span>Banks</span></button>
     <button class="mnb" onclick="showTab('ai',this)" id="mnb-ai"><span class="mnb-icon">🤖</span><span>AI</span></button>
     <button class="mnb" onclick="showTab('invest',this)" id="mnb-invest"><span class="mnb-icon">💹</span><span>Invest</span></button>
+    <button class="mnb" onclick="showTab('scholarships',this)" id="mnb-scholarships"><span class="mnb-icon">🎓</span><span>Aid</span></button>
   </div>
 </nav>
 

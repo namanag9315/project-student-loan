@@ -62,8 +62,8 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sa
 
 /* ── Tabs ── */
 .tabs { background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
-  padding: 4px; display: flex; gap: 4px; margin-bottom: 14px; box-shadow: 0 1px 2px rgba(0,0,0,0.02); }
-.tab { flex: 1; padding: 10px 8px; border-radius: 6px; border: none; background: transparent;
+  padding: 4px; display: flex; gap: 4px; margin-bottom: 14px; box-shadow: 0 1px 2px rgba(0,0,0,0.02); overflow-x: auto; }
+.tab { flex: 1; min-width: 110px; padding: 10px 8px; border-radius: 6px; border: none; background: transparent;
   color: var(--text2); font-size: 13px; font-weight: 600; cursor: pointer; transition: all .2s;
   display: flex; align-items: center; justify-content: center; gap: 6px; }
 .tab:hover { background: var(--surface2); color: var(--text); }
@@ -76,8 +76,8 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sa
 .mobile-nav { display: none; position: fixed; bottom: 0; left: 0; right: 0; z-index: 100;
   background: var(--surface); border-top: 1px solid var(--border);
   padding: 8px 0 max(8px, env(safe-area-inset-bottom)); box-shadow: 0 -2px 10px rgba(0,0,0,0.05); }
-.mobile-nav-inner { display: flex; }
-.mnb { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px;
+.mobile-nav-inner { display: flex; overflow-x: auto; }
+.mnb { min-width: 64px; display: flex; flex-direction: column; align-items: center; gap: 4px;
   padding: 6px; background: none; border: none; color: var(--text3); font-size: 11px;
   cursor: pointer; font-weight: 500; }
 .mnb.active { color: var(--blue); font-weight: 600; }
